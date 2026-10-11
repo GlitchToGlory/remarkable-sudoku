@@ -1,0 +1,9 @@
+{
+    "id": "remarkable-sudoku",
+    "name": "Sudoku",
+    "loadsBackend": false,
+    "entry": "/qml/main.qml",
+    "canHaveMultipleFrontends": false,
+    "supportsScaling": true,
+    "aspectRatio": "original"
+}

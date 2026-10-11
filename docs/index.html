@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>reMarkable Sudoku - web demo</title>
+<style>
+  :root { --bg:#fff; --fg:#000; --mut:#444; --sel:#b0b0b0; --peer:#ebebeb; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#111; --fg:#fff; --mut:#bbb; --sel:#555; --peer:#222; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font-family:system-ui,sans-serif; display:flex; justify-content:center; }
+  main { width:min(100%,520px); padding:16px; box-sizing:border-box; }
+  h1 { font-size:1.1rem; margin:0 0 4px; }
+  p { color:var(--mut); font-size:.85rem; margin:0 0 12px; }
+  a { color:inherit; }
+  .row { display:flex; gap:8px; margin:8px 0; }
+  .row button { flex:1; }
+  button { font-size:1rem; padding:10px 0; border:2px solid var(--fg); border-radius:8px; background:var(--bg); color:var(--fg); cursor:pointer; }
+  button.on { background:var(--fg); color:var(--bg); }
+  button:active { filter:invert(1); }
+  #status { text-align:center; min-height:1.4em; margin:6px 0; }
+  #board { display:grid; grid-template-columns:repeat(9,1fr); border:3px solid var(--fg); }
+  .cell { aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-size:clamp(16px,5vw,28px);
+          border-right:1px solid var(--fg); border-bottom:1px solid var(--fg); cursor:pointer; user-select:none; }
+  .cell.r { border-right:3px solid var(--fg); } .cell.b { border-bottom:3px solid var(--fg); }
+  .cell.given { font-weight:700; }
+  .cell.peer { background:var(--peer); } .cell.sel { background:var(--sel); }
+  .cell.wrong { background:var(--fg); color:var(--bg); }
+  .notes { font:clamp(7px,1.7vw,10px)/1.1 monospace; white-space:pre; }
+  #pad button { font-size:1.3rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>reMarkable Sudoku</h1>
+  <p>Web demo of the same engine (<code>sudoku.js</code>) that runs on the tablet. <a href="https://github.com/GlitchToGlory/remarkable-sudoku">Source on GitHub</a></p>
+  <div class="row" id="levels"></div>
+  <div id="status">Loading...</div>
+  <div id="board"></div>
+  <div class="row" id="pad"></div>
+  <div class="row" id="tools"></div>
+</main>
+<script>
+fetch("sudoku.js").then(r => r.text()).then(src => {
+  const S = new Function(src.replace(/^\.pragma library.*$/m, "") +
+    "; return { newGame, select, input, erase, hint, toggleNotes, toggleCheck, cells, statusText, blankState };")();
+  let st = S.blankState(), busy = false, level = "Easy";
+  const $ = id => document.getElementById(id);
+  const boardEl = $("board"), statusEl = $("status");
+  const cellEls = [];
+  for (let i = 0; i < 81; i++) {
+    const d = document.createElement("div");
+    d.className = "cell" + (i % 9 % 3 === 2 && i % 9 < 8 ? " r" : "") + (Math.floor(i / 9) % 3 === 2 && i < 72 ? " b" : "");
+    d.onclick = () => { st = S.select(st, i); render(); };
+    boardEl.appendChild(d); cellEls.push(d);
+  }
+  function btn(parent, label, fn) {
+    const b = document.createElement("button"); b.textContent = label; b.onclick = fn; parent.appendChild(b); return b;
+  }
+  const levelBtns = ["Easy", "Medium", "Hard"].map(l => btn($("levels"), l, () => start(l)));
+  for (let n = 1; n <= 9; n++) btn($("pad"), n, () => { st = S.input(st, n); render(); });
+  const notesB = btn($("tools"), "Notes", () => { st = S.toggleNotes(st); render(); });
+  btn($("tools"), "Erase", () => { st = S.erase(st); render(); });
+  btn($("tools"), "Hint", () => { st = S.hint(st); render(); });
+  const checkB = btn($("tools"), "Check", () => { st = S.toggleCheck(st); render(); });
+  btn($("tools"), "New", () => start(level));
+
+  function start(l) {
+    level = l; busy = true; render();
+    setTimeout(() => { st = S.newGame(l); busy = false; render(); }, 30);
+  }
+  function render() {
+    const cv = S.cells(st);
+    cv.forEach((c, i) => {
+      const el = cellEls[i];
+      el.className = el.className.replace(/ ?(given|peer|sel|wrong)/g, "") +
+        (c.given ? " given" : "") + (c.peer ? " peer" : "") + (c.sel ? " sel" : "") + (c.wrong ? " wrong" : "");
+      if (c.v) { el.textContent = c.v; }
+      else if (c.notes) { el.innerHTML = '<span class="notes"></span>'; el.firstChild.textContent = c.notes; }
+      else el.textContent = "";
+    });
+    statusEl.textContent = S.statusText(st, busy);
+    notesB.classList.toggle("on", st.notesMode);
+    checkB.classList.toggle("on", st.showMistakes);
+    levelBtns.forEach(b => b.classList.toggle("on", b.textContent === st.level));
+  }
+  document.addEventListener("keydown", e => {
+    if (e.key >= "1" && e.key <= "9") st = S.input(st, +e.key);
+    else if (e.key === "Backspace" || e.key === "Delete") st = S.erase(st);
+    else return;
+    render();
+  });
+  start("Easy");
+}).catch(() => { document.getElementById("status").textContent = "Could not load sudoku.js"; });
+</script>
+</body>
+</html>
