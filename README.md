@@ -1,6 +1,6 @@
 # reMarkable Sudoku
 
-A standalone Sudoku game for the **reMarkable Paper Pure**, built as an [AppLoad](https://github.com/asivery/rm-appload) (xovi) QML app. Grayscale highlights and no animations, designed for e-ink and pen taps.
+A standalone Sudoku game for the **reMarkable Paper Pure**, built as an [AppLoad](https://github.com/asivery/rm-appload) (xovi) QML app. Grayscale highlights and no animations, designed for e-ink. This should work on other reMarkable tablets, but has not been tested on all models.
 
 **[Live web demo](https://GlitchToGlory.github.io/remarkable-sudoku/)** (same puzzle engine as the tablet app)
 
