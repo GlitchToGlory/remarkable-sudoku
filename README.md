@@ -4,8 +4,7 @@ A standalone Sudoku game for the **reMarkable Paper Pure**, built as an [AppLoad
 
 **[Live web demo](https://GlitchToGlory.github.io/remarkable-sudoku/)** (same puzzle engine as the tablet app)
 
-![Sudoku running on a reMarkable Paper Pure](docs/photo.jpg)
--->
+[Sudoku running on a reMarkable Paper Pure](docs/photo.jpg)
 
 ## Features
 - Fresh puzzles every time, in three difficulty levels (Easy, Medium, Hard)
