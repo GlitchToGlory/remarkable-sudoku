@@ -17,6 +17,7 @@
   button { font-size:1rem; padding:10px 0; border:2px solid var(--fg); border-radius:8px; background:var(--bg); color:var(--fg); cursor:pointer; }
   button.on { background:var(--fg); color:var(--bg); }
   button:active { filter:invert(1); }
+  button:disabled { opacity:.4; cursor:default; }
   #status { text-align:center; min-height:1.4em; margin:6px 0; }
   #board { display:grid; grid-template-columns:repeat(9,1fr); border:3px solid var(--fg); }
   .cell { aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-size:clamp(16px,5vw,28px);
@@ -42,7 +43,7 @@
 <script>
 fetch("sudoku.js").then(r => r.text()).then(src => {
   const S = new Function(src.replace(/^\.pragma library.*$/m, "") +
-    "; return { newGame, select, input, erase, hint, toggleNotes, toggleCheck, cells, statusText, blankState };")();
+    "; return { newGame, select, input, erase, hint, undo, canUndo, toggleNotes, toggleCheck, cells, statusText, blankState };")();
   let st = S.blankState(), busy = false, level = "Easy";
   const $ = id => document.getElementById(id);
   const boardEl = $("board"), statusEl = $("status");
@@ -59,7 +60,7 @@ fetch("sudoku.js").then(r => r.text()).then(src => {
   const levelBtns = ["Easy", "Medium", "Hard"].map(l => btn($("levels"), l, () => start(l)));
   for (let n = 1; n <= 9; n++) btn($("pad"), n, () => { st = S.input(st, n); render(); });
   const notesB = btn($("tools"), "Notes", () => { st = S.toggleNotes(st); render(); });
-  btn($("tools"), "Erase", () => { st = S.erase(st); render(); });
+  const undoB = btn($("tools"), "Undo", () => { st = S.undo(st); render(); });
   btn($("tools"), "Hint", () => { st = S.hint(st); render(); });
   const checkB = btn($("tools"), "Check", () => { st = S.toggleCheck(st); render(); });
   btn($("tools"), "New", () => start(level));
@@ -81,11 +82,13 @@ fetch("sudoku.js").then(r => r.text()).then(src => {
     statusEl.textContent = S.statusText(st, busy);
     notesB.classList.toggle("on", st.notesMode);
     checkB.classList.toggle("on", st.showMistakes);
+    undoB.disabled = !S.canUndo(st);
     levelBtns.forEach(b => b.classList.toggle("on", b.textContent === st.level));
   }
   document.addEventListener("keydown", e => {
     if (e.key >= "1" && e.key <= "9") st = S.input(st, +e.key);
     else if (e.key === "Backspace" || e.key === "Delete") st = S.erase(st);
+    else if (e.key === "z" && (e.metaKey || e.ctrlKey)) st = S.undo(st);
     else return;
     render();
   });

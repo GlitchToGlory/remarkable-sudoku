@@ -1,7 +1,7 @@
 // Run with: node tests/test.js
 const fs = require("fs");
 const src = fs.readFileSync(__dirname + "/../src/qml/sudoku.js", "utf8").replace(/^\.pragma library.*$/m, "");
-const S = new Function(src + "; return { newGame, makePuzzle, countSolutions, select, input, erase, hint, toggleNotes, toggleCheck, cells, statusText, blankState, PEERS, LEVELS };")();
+const S = new Function(src + "; return { newGame, makePuzzle, countSolutions, select, input, erase, hint, canHint, undo, canUndo, toggleNotes, toggleCheck, cells, statusText, blankState, PEERS, LEVELS };")();
 
 function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 let failed = 0;
@@ -63,6 +63,22 @@ ok((n.notes[p] & (1 << sol)) === 0, "placing a digit clears peer notes");
 // Hint
 let h = S.hint(S.select(g, b));
 ok(h.values[b] === sol && h.hints === 1, "hint reveals digit");
+
+// Undo
+ok(!S.canUndo(g), "nothing to undo in a new game");
+let u = S.input(S.select(g, b), wrong);
+u = S.input(u, sol);
+ok(S.canUndo(u) && u.values[b] === sol, "two moves made");
+u = S.undo(u);
+ok(u.values[b] === wrong, "undo returns to the previous digit");
+u = S.undo(u);
+ok(u.values[b] === 0 && !S.canUndo(u), "undo back to the start");
+ok(S.undo(u) === u, "undo with no history does nothing");
+u = S.undo(S.hint(S.select(g, b)));
+ok(u.values[b] === 0 && u.hints === 0, "undo takes back a hint");
+u = S.undo(S.input(n, wrong));
+ok(u.notes[p] === n.notes[p] && u.notes[b] === n.notes[b], "undo restores notes");
+ok(S.canHint(S.select(g, b)) && !S.canHint(g) && !S.canHint(S.select(g, given)), "canHint needs an unsolved, selected cell");
 
 // Full solve
 let w = g;

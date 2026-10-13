@@ -4,6 +4,7 @@
 
 // Target number of given digits left on the board (fewer = harder).
 var LEVELS = { Easy: 40, Medium: 32, Hard: 26 };
+var HISTORY_MAX = 300;   // how many steps Undo can go back
 
 var PEERS = [];     // PEERS[i]   = the 20 cells sharing a row/column/box with cell i
 var PEERSET = [];   // PEERSET[i] = array of 81 booleans for quick lookup
@@ -110,7 +111,7 @@ function makePuzzle(level, rng) {
 function blankState() {
     return { level: "", puzzle: zeros(81), solution: zeros(81), values: zeros(81),
              notes: zeros(81), sel: -1, notesMode: false, showMistakes: false,
-             hints: 0, won: false };
+             hints: 0, won: false, history: [] };
 }
 
 function newGame(level, rng) {
@@ -127,7 +128,13 @@ function copy(st) {
     return { level: st.level, puzzle: st.puzzle, solution: st.solution,
              values: st.values.slice(), notes: st.notes.slice(), sel: st.sel,
              notesMode: st.notesMode, showMistakes: st.showMistakes,
-             hints: st.hints, won: st.won };
+             hints: st.hints, won: st.won, history: st.history };
+}
+
+// Saves the board as it was in `st` so undo() can return to it.
+function remember(c, st) {
+    c.history = st.history.concat([{ values: st.values, notes: st.notes, hints: st.hints }]);
+    if (c.history.length > HISTORY_MAX) c.history.shift();
 }
 
 function checkWon(st) {
@@ -153,9 +160,11 @@ function input(st, n) {
     var c = copy(st), i = c.sel;
     if (c.notesMode) {
         if (c.values[i]) return st;
+        remember(c, st);
         c.notes[i] ^= (1 << n);
         return c;
     }
+    remember(c, st);
     if (c.values[i] === n) c.values[i] = 0;
     else place(c, i, n);
     c.won = checkWon(c);
@@ -164,19 +173,39 @@ function input(st, n) {
 
 function erase(st) {
     if (!st.level || st.won || st.sel < 0 || st.puzzle[st.sel]) return st;
+    if (!st.values[st.sel] && !st.notes[st.sel]) return st;
     var c = copy(st);
+    remember(c, st);
     c.values[c.sel] = 0;
     c.notes[c.sel] = 0;
     return c;
 }
 
+function canHint(st) {
+    return !!st.level && !st.won && st.sel >= 0 && !st.puzzle[st.sel] &&
+           st.values[st.sel] !== st.solution[st.sel];
+}
+
 function hint(st) {
-    if (!st.level || st.won || st.sel < 0 || st.puzzle[st.sel]) return st;
-    if (st.values[st.sel] === st.solution[st.sel]) return st;
+    if (!canHint(st)) return st;
     var c = copy(st);
+    remember(c, st);
     place(c, c.sel, c.solution[c.sel]);
     c.hints++;
     c.won = checkWon(c);
+    return c;
+}
+
+function canUndo(st) { return !!st.level && !st.won && st.history.length > 0; }
+
+// Takes back the last digit, note, erase or hint.
+function undo(st) {
+    if (!canUndo(st)) return st;
+    var c = copy(st), h = st.history[st.history.length - 1];
+    c.history = st.history.slice(0, -1);
+    c.values = h.values.slice();
+    c.notes = h.notes.slice();
+    c.hints = h.hints;
     return c;
 }
 

@@ -9,7 +9,9 @@ A standalone Sudoku game for the **reMarkable Paper Pure**, built as an [AppLoad
 ## Features
 - Fresh puzzles every time, in three difficulty levels (Easy, Medium, Hard)
 - Every puzzle is guaranteed to have exactly one solution
-- Pencil notes, erase, hints, and a "Check" mode that flags wrong digits
+- Pencil notes, undo, and a "Check" mode that flags wrong digits
+- A menu for starting a new game, choosing the difficulty, hints, dark mode and closing the app
+- A refresh button that flashes the screen to clear e-ink ghosting
 - Adapts to the screen: scales to any reMarkable resolution and switches between portrait and landscape layouts
 - Highlights the selected cell and its row, column and box
 - Pencil marks are tidied automatically when you place a digit
@@ -42,6 +44,7 @@ This runs the tests, compiles the QML into `resources.rcc`, and produces `dist/s
 src/qml/main.qml     UI
 src/qml/Btn.qml      button component
 src/qml/sudoku.js    generator, solver and game state (shared with the web demo)
+src/qml/icons/       refresh icon (drawn by tools/make_refresh_icon.py)
 src/resources.qrc    Qt resource manifest
 package/             manifest.json + icon.png for AppLoad
 docs/                GitHub Pages demo
