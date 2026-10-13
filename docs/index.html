@@ -5,19 +5,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>reMarkable Sudoku - web demo</title>
 <style>
-  :root { --bg:#fff; --fg:#000; --mut:#444; --sel:#b0b0b0; --peer:#ebebeb; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#111; --fg:#fff; --mut:#bbb; --sel:#555; --peer:#222; } }
+  /* Same look as the tablet app: black on white, or white on black in dark mode. */
+  :root { --bg:#fff; --fg:#000; --mut:#444; --sel:#b0b0b0; --peer:#ebebeb; --note:#222; --off:#888; }
+  :root[data-theme="dark"] { --bg:#000; --fg:#fff; --mut:#bbb; --sel:#707070; --peer:#303030; --note:#ddd; }
   body { margin:0; background:var(--bg); color:var(--fg); font-family:system-ui,sans-serif; display:flex; justify-content:center; }
   main { width:min(100%,520px); padding:16px; box-sizing:border-box; }
-  h1 { font-size:1.1rem; margin:0 0 4px; }
   p { color:var(--mut); font-size:.85rem; margin:0 0 12px; }
   a { color:inherit; }
+  #app { position:relative; }
+  header { display:flex; align-items:center; justify-content:space-between; }
+  h1 { font-size:1.7rem; margin:0; }
+  #refresh { width:44px; height:44px; padding:0; border:0; border-radius:50%; background:#fff; color:#000;
+             display:flex; align-items:center; justify-content:center; }
+  #refresh:active { background:#b4b4b4; filter:none; }
+  #refresh svg { width:30px; height:30px; }
   .row { display:flex; gap:8px; margin:8px 0; }
   .row button { flex:1; }
-  button { font-size:1rem; padding:10px 0; border:2px solid var(--fg); border-radius:8px; background:var(--bg); color:var(--fg); cursor:pointer; }
+  button { font:inherit; font-size:1rem; padding:10px 0; border:3px solid var(--fg); border-radius:10px; background:var(--bg); color:var(--fg); cursor:pointer; }
   button.on { background:var(--fg); color:var(--bg); }
   button:active { filter:invert(1); }
-  button:disabled { opacity:.4; cursor:default; }
+  button:disabled { border-color:var(--off); color:var(--off); cursor:default; filter:none; }
   #status { text-align:center; min-height:1.4em; margin:6px 0; }
   #board { display:grid; grid-template-columns:repeat(9,1fr); border:3px solid var(--fg); }
   .cell { aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-size:clamp(16px,5vw,28px);
@@ -26,25 +33,53 @@
   .cell.given { font-weight:700; }
   .cell.peer { background:var(--peer); } .cell.sel { background:var(--sel); }
   .cell.wrong { background:var(--fg); color:var(--bg); }
-  .notes { font:clamp(7px,1.7vw,10px)/1.1 monospace; white-space:pre; }
+  .notes { font:clamp(7px,1.7vw,10px)/1.1 monospace; white-space:pre; color:var(--note); }
   #pad button { font-size:1.3rem; }
+  /* Menu covers the game, as on the tablet */
+  #menu { position:absolute; inset:-4px; background:var(--bg); display:flex; flex-direction:column; justify-content:center; gap:10px; padding:0 6%; }
+  #menu[hidden], #flash[hidden] { display:none; }
+  #menu h2 { text-align:center; font-size:1.9rem; margin:0 0 4px; }
+  #menu .label { margin-top:4px; }
+  #menu .row { margin:0; }
+  #menu .gap { height:6px; }
+  #menu .big { font-size:1.2rem; padding:14px 0; }
+  #flash { position:fixed; inset:0; background:var(--fg); }
 </style>
 </head>
 <body>
 <main>
-  <h1>reMarkable Sudoku</h1>
-  <p>Web demo of the same engine (<code>sudoku.js</code>) that runs on the tablet. <a href="https://github.com/GlitchToGlory/remarkable-sudoku">Source on GitHub</a></p>
-  <div class="row" id="levels"></div>
-  <div id="status">Loading...</div>
-  <div id="board"></div>
-  <div class="row" id="pad"></div>
-  <div class="row" id="tools"></div>
+  <p>Web demo of the reMarkable Sudoku app, using the same engine (<code>sudoku.js</code>) that runs on the tablet. <a href="https://github.com/GlitchToGlory/remarkable-sudoku">Source on GitHub</a></p>
+  <div id="app">
+    <header>
+      <h1>Sudoku</h1>
+      <button id="refresh" aria-label="Refresh screen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M19 12.5a7.2 7.2 0 1 1-2.4-5.4"/><path d="M19.6 3.6v5.2h-5.2z" fill="currentColor" stroke-linejoin="round" stroke-width="1.2"/></svg>
+      </button>
+    </header>
+    <div id="status">Loading...</div>
+    <div id="board"></div>
+    <div class="row" id="pad"></div>
+    <div class="row" id="tools"></div>
+
+    <div id="menu">
+      <h2>Menu</h2>
+      <div class="label">Difficulty</div>
+      <div class="row" id="levels"></div>
+      <div class="gap"></div>
+      <button id="start" class="on big">Start new game</button>
+      <button id="back">Back to current game</button>
+      <div class="gap"></div>
+      <button id="hint"></button>
+      <button id="dark"></button>
+    </div>
+  </div>
 </main>
+<div id="flash" hidden></div>
 <script>
 fetch("sudoku.js").then(r => r.text()).then(src => {
   const S = new Function(src.replace(/^\.pragma library.*$/m, "") +
-    "; return { newGame, select, input, erase, hint, undo, canUndo, toggleNotes, toggleCheck, cells, statusText, blankState };")();
-  let st = S.blankState(), busy = false, level = "Easy";
+    "; return { newGame, select, input, erase, hint, canHint, undo, canUndo, toggleNotes, toggleCheck, cells, statusText, blankState };")();
+  let st = S.blankState(), busy = false, optLevel = "Easy", showMenu = true, dark = false;
   const $ = id => document.getElementById(id);
   const boardEl = $("board"), statusEl = $("status");
   const cellEls = [];
@@ -57,16 +92,22 @@ fetch("sudoku.js").then(r => r.text()).then(src => {
   function btn(parent, label, fn) {
     const b = document.createElement("button"); b.textContent = label; b.onclick = fn; parent.appendChild(b); return b;
   }
-  const levelBtns = ["Easy", "Medium", "Hard"].map(l => btn($("levels"), l, () => start(l)));
   for (let n = 1; n <= 9; n++) btn($("pad"), n, () => { st = S.input(st, n); render(); });
-  const notesB = btn($("tools"), "Notes", () => { st = S.toggleNotes(st); render(); });
+  btn($("tools"), "Menu", () => { showMenu = true; render(); });
   const undoB = btn($("tools"), "Undo", () => { st = S.undo(st); render(); });
-  btn($("tools"), "Hint", () => { st = S.hint(st); render(); });
+  const notesB = btn($("tools"), "Notes", () => { st = S.toggleNotes(st); render(); });
   const checkB = btn($("tools"), "Check", () => { st = S.toggleCheck(st); render(); });
-  btn($("tools"), "New", () => start(level));
+
+  const levelBtns = ["Easy", "Medium", "Hard"].map(l => btn($("levels"), l, () => { optLevel = l; render(); }));
+  $("start").onclick = () => start(optLevel);
+  $("back").onclick = () => { showMenu = false; render(); };
+  $("hint").onclick = () => { st = S.hint(st); showMenu = false; render(); };
+  $("dark").onclick = () => { dark = !dark; render(); };
+  // Refresh: on the tablet this flashes the screen to clear e-ink ghosting.
+  $("refresh").onclick = () => { $("flash").hidden = false; setTimeout(() => { $("flash").hidden = true; }, 200); };
 
   function start(l) {
-    level = l; busy = true; render();
+    showMenu = false; busy = true; render();
     setTimeout(() => { st = S.newGame(l); busy = false; render(); }, 30);
   }
   function render() {
@@ -83,16 +124,26 @@ fetch("sudoku.js").then(r => r.text()).then(src => {
     notesB.classList.toggle("on", st.notesMode);
     checkB.classList.toggle("on", st.showMistakes);
     undoB.disabled = !S.canUndo(st);
-    levelBtns.forEach(b => b.classList.toggle("on", b.textContent === st.level));
+
+    const inGame = st.level !== "" && !busy;
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    $("menu").hidden = !showMenu;
+    levelBtns.forEach(b => b.classList.toggle("on", b.textContent === optLevel));
+    $("back").hidden = !inGame;
+    $("hint").hidden = !inGame || st.won;
+    $("hint").disabled = !S.canHint(st);
+    $("hint").textContent = S.canHint(st) ? "Hint: reveal the selected cell" : "Hint: select an empty cell first";
+    $("dark").textContent = dark ? "Dark mode: On" : "Dark mode: Off";
   }
   document.addEventListener("keydown", e => {
+    if (showMenu) return;
     if (e.key >= "1" && e.key <= "9") st = S.input(st, +e.key);
     else if (e.key === "Backspace" || e.key === "Delete") st = S.erase(st);
     else if (e.key === "z" && (e.metaKey || e.ctrlKey)) st = S.undo(st);
     else return;
     render();
   });
-  start("Easy");
+  render();
 }).catch(() => { document.getElementById("status").textContent = "Could not load sudoku.js"; });
 </script>
 </body>
